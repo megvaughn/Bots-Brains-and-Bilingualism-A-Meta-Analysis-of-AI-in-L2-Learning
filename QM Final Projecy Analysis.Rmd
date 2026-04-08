@@ -1,0 +1,170 @@
+---
+title: "QM Final Project"
+output: pdf_document
+date: "2026-04-08"
+---
+
+```{r}
+library(readxl)
+library(metafor)
+
+# load meta analysis data
+data <- read_excel("Desktop/quantitative language research/Final Project/QM Final Project Data.xlsx")
+
+head(data)
+```
+
+```{r}
+# run meta analysis
+res <- rma(yi = Cohen_d, sei = Standard_Error, data = data, method = "REML")
+summary(res)
+```
+
+A random-effects meta-analysis was conducted to examine the effect of AI on L2 learning outcomes. The overall effect size was not statistically significant, $d$ = 10.87, 95% CI [-7.68, 29.43], $p$ = 0.25. However, the heterogeneity was extremely high, $I^2$ = 99.99%, indicating substantial variability across studies. This suggests that the effects of AI on language learning differ considerably depending on factors such as skill type, AI tool, and study design. Additionally, the overall effect size appears to be influenced by an extreme outlier, which may have inflated the estimate.
+
+```{r}
+# data without outlier zhang study
+data_no_outlier <- subset(data, Cohen_d < 5)
+
+res2 <- rma(yi = Cohen_d, sei = Standard_Error, data = data_no_outlier, method = "REML")
+
+summary(res2)
+```
+
+A random-effects meta-analysis was conducted to examine the effect of AI on L2 learning outcomes. After removing one extreme outlier, the overall effect size was large and statistically significant, $d$ = 1.50, 95% CI [0.72, 2.28], $p$ \< 0.001. This indicates that AI has a strong positive impact on language learning performance. However, heterogeneity remained high ($I^2$ = 95.8%), suggesting substantial variability across studies, likely due to differences in skill type, AI tools, and study design.
+
+```{r}
+# forest plot
+forest(res, slab = data$Study_ID, xlab = "Effect Size (Cohen's d")
+```
+
+This forest plot shows that most studies report positive effects of AI on L2 learning, with effect sizes generally ranging from moderate to large. However, one study (Zhang2024) reported an extremely large effect size, which substantially influenced the overall estimate and compressed the visualization of other studies. While the majority of confidence intervals did not cross zero, indicating statistically significant effects, the overall meta-analytic estimate was not sinificant due to the presence of this outlier and high heterogeneity.
+
+```{r}
+# forest plot without outlier (Zhang2024)
+forest(res2,
+       slab = data_no_outlier$Study_ID,
+       xlab = "Effect Size (Cohen's d)",
+       main = "Forest Plot (Outlier Removed)",
+       col = "darkblue",
+       pch = 19,
+       cex = 0.9)
+```
+
+The forest plot without the outlier shows consistent positive effects across studies, with most effect sizes ranging from moderate to large. The overall effect is clearly positive and statistically significant, and the visualization is no longer distorted by extreme values.
+
+```{r}
+# funnel plot
+funnel(res)
+```
+
+The funnel plot demonstrates noticeable asymmetry, which may indicate potential publication bias. However, given the small sample size and the presence of an extreme outlier, the observed asymmetry is more likely attributable to the heterogeneity and outlier influence rather than true publication bias.
+
+```{r}
+# funnel plot without outlier (Zhang2024)
+funnel(res2)
+```
+
+The funnel plot without the outlier appeared approximately symmetrical, with studies distributed evenly around the overall effect size. This suggests that there is no strong evidence of publication bias. The asymmetry observed in the original funnel plot was likely driven by the presence of an extreme outlier rather than symmetric bias.
+
+```{r}
+# egger's test
+regtest(res)
+```
+
+```{r}
+# subgroup analysis
+res_skill <- rma(yi = Cohen_d, sei = Standard_Error, mods = ~ Skill, data = data)
+summary(res_skill)
+```
+
+```{r}
+# effect sizes overview plot
+library(ggplot2)
+
+ggplot(data, aes(x = reorder(Study_ID, Cohen_d), y = Cohen_d)) + geom_point(size = 3) + geom_errorbar(aes(ymin = CI_Lower, ymax = CI_Upper), width = 0.2) + coord_flip() + labs(title = "Effect Sizes Across Studies", x = "Study", y = "Cohen's d") + theme_minimal()
+```
+
+```{r}
+# boxplot of effect sizes
+ggplot(data, aes(y = Cohen_d)) + geom_boxplot() + labs(title = "Distrubution of Effect Sizes", y = "Cohen's d") + theme_minimal()
+```
+
+```{r}
+# histogram of effect sizes
+ggplot(data, aes(x = Cohen_d)) + geom_histogram(bins = 10, fill = "orchid", alpha = 0.8) + labs(title = "Histogram of Effect Sizes", x = "Cohen's d") + theme_minimal()
+```
+
+```{r}
+# skill based comparison
+# does ai work better for vocabulary v. speaking v. writing?
+ggplot(data, aes(x = Skill, y = Cohen_d, fill = Skill)) + geom_boxplot() + labs(title = "Effect Size by Skill Type", x = "Skill", y = "Cohen's d") + theme_minimal()
+```
+
+```{r}
+# mean effect per skill
+library(dplyr)
+
+skill_summary <- data %>%
+  group_by(Skill) %>%
+  summarise(mean_d = mean(Cohen_d))
+
+ggplot(skill_summary, aes(x = Skill, y = mean_d, fill = Skill)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Average Effect Size by Skill",
+       y = "Mean Cohen's d") +
+  theme_minimal()
+```
+
+```{r}
+# ai tool comparison
+ggplot(tool_summary, aes(x = reorder(AI_Tool, mean_d), y = mean_d, fill = AI_Tool)) +
+  geom_bar(stat = "identity") +
+  coord_flip() +
+  labs(title = "Effect Size by AI Tool",
+       x = "AI Tool",
+       y = "Mean Cohen's d") +
+  theme_minimal() +
+  theme(
+    legend.position = "none",
+    plot.title = element_text(face = "bold", size = 18),
+    axis.title = element_text(size = 14)
+  )
+```
+
+```{r}
+# sample size v. effect size
+# do smaller studies show bigger effects?
+
+ggplot(data, aes(x = Sample_Size_Total, y = Cohen_d)) +
+  geom_point(size = 3) +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(title = "Effect Size vs Sample Size",
+       x = "Sample Size",
+       y = "Cohen's d") +
+  theme_minimal()
+```
+
+```{r}
+# bubble plot combining effect size, sample size, and skill
+
+ggplot(data, aes(x = Skill, y = Cohen_d, size = Sample_Size_Total, color = Skill)) +
+  geom_point(alpha = 0.7) +
+  labs(title = "Effect Size by Skill (Bubble Plot)",
+       y = "Cohen's d") +
+  theme_minimal()
+```
+
+```{r}
+# confidence interval width plot
+data$CI_Width <- data$CI_Upper - data$CI_Lower
+
+ggplot(data, aes(x = reorder(Study_ID, CI_Width), y = CI_Width, fill = CI_Width)) +
+  geom_bar(stat = "identity") +
+  coord_flip() +
+  scale_fill_gradient(low = "pink", high = "orchid") +
+  labs(title = "Confidence Interval Width by Study",
+       x = "Study",
+       y = "CI Width") +
+  theme_minimal()
+```
